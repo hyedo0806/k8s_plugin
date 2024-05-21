@@ -6,35 +6,40 @@ check_ready_node() {
     cnt_node=$(kubectl get node --no-headers|wc -l)
     cnt_ready_node=$(kubectl get nodes | awk '$2 == "Ready" {count++} END {print count}')
     cnt_notready_node=$((cnt_node-cnt_ready_node))
-    echo "# node : " $cnt_node
-    echo "  # ready_node : " $cnt_ready_node
-    echo "  # notready_node : " $cnt_notready_node
-    return cnt_notready_node
+    #echo "# node : " $cnt_node
+    #echo "  # ready_node : " $cnt_ready_node
+    #echo "  # notready_node : " $cnt_notready_node
+    echo $cnt_notready_node
 }
 
 check_ready_pod() {
     cnt_pod=$(kubectl get pods | awk 'NR>1 {split($2, a, "/"); sum += a[2]} END {print sum}')
     cnt_ready_pod=$(kubectl get pods | awk 'NR>1 {split($2, a, "/"); sum += a[1]} END {print sum}')
     cnt_notready_pod=$((cnt_pod-cnt_ready_pod))
-    echo "# pod : " $cnt_pod
-    echo "  # ready_pod : " $cnt_ready_pod
-    echo "  # notready_pod : " $cnt_notready_pod
-    return cnt_notready_pod
+    #echo "# pod : " $cnt_pod
+    #echo "  # ready_pod : " $cnt_ready_pod
+    #echo "  # notready_pod : " $cnt_notready_pod
+    echo $cnt_notready_pod
 }
 
     
 
 while :; do
     echo "Retrying ... "
-
+    hello=0
     notready_node=$(check_ready_node)
     notready_pod=$(check_ready_pod)
+    echo -e "\nDEBUG : " $notready_node
+    echo -e "\nDEBUG : " $notready_pod
 
     if [ $notready_node -eq 0 ] && [ $notready_pod -eq 0 ]; then
         echo -e "\nReady"
         break
+    fi
     
-    if [ $((cnt_notready_pod)) -ne 0 ]; then
+    echo -e "\nDEBUG cnt_notready_pod : " $cnt_notready_pod
+
+    if [ $hello -eq 0 ]; then
         
         podsInfo=$(kubectl get pods)
         
@@ -49,7 +54,6 @@ while :; do
                 continue
             fi
 
-        #echo $line
             # 각 줄을 공백으로 분할하여 필드를 가져옴
             fields=($line)
             if [ ${#fields[@]} -lt 3 ]; then
@@ -58,8 +62,8 @@ while :; do
 
             statusCount=${fields[1]}
             status=${fields[2]}
-        # 슬래시 기호로 READY 상태를 분할
-        IFS='/' read -ra statusParts <<< "$statusCount"
+            # 슬래시 기호로 READY 상태를 분할
+	    IFS='/' read -ra statusParts <<< "$statusCount"
             if [ ${#statusParts[@]} -ne 2 ]; then
                 continue
             fi
@@ -76,7 +80,7 @@ while :; do
                 #echo "Terminating"
                 terminatingCount=$((terminatingCount + ${statusParts[1]}))
                     ;;
-        esac
+       	    esac
         done <<< "$lines"
 
         echo "	Pending: $pendingCount"
@@ -88,8 +92,4 @@ done
 
 
 
-#if [ $cnt_node -eq $cnt_ready_node ] && [ $cnt_pod -eq $cnt_ready_pod ]; then
-#	echo -e "\npass!!"
-#else
-#	echo -e "\nerror!!"
-#fi
+
