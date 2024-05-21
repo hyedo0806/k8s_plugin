@@ -1,0 +1,75 @@
+#!/bin/bash
+
+pod_status=("Pending", "Running", "Terminating", "Failed", "Unknown")
+
+cnt_node=$(kubectl get node --no-headers|wc -l)
+cnt_ready_node=$(kubectl get nodes | awk '$2 == "Ready" {count++} END {print count}')
+cnt_notready_node=$((cnt_node-cnt_ready_node))
+echo "# node : " $cnt_node
+echo "  # ready_node : " $cnt_ready_node
+echo "  # notready_node : " $cnt_notready_node
+
+cnt_pod=$(kubectl get pods | awk 'NR>1 {split($2, a, "/"); sum += a[2]} END {print sum}')
+cnt_ready_pod=$(kubectl get pods | awk 'NR>1 {split($2, a, "/"); sum += a[1]} END {print sum}')
+cnt_notready_pod=$((cnt_pod-cnt_ready_pod))
+echo "# pod : " $cnt_pod
+echo "  # ready_pod : " $cnt_ready_pod
+echo "  # notready_pod : " $cnt_notready_pod
+
+if [ $((cnt_notready_pod)) -ne 0 ]; then
+    
+    podsInfo=$(kubectl get pods)
+    
+    # 포드 정보를 줄 단위로 분할
+    lines=$(echo "$podsInfo" | tail -n +2)
+    
+    pendingCount=0
+    terminatingCount=0
+
+    while read -r line; do
+        if [ -z "$line" ]; then
+            continue
+        fi
+
+	#echo $line
+        # 각 줄을 공백으로 분할하여 필드를 가져옴
+        fields=($line)
+        if [ ${#fields[@]} -lt 3 ]; then
+            continue
+        fi
+
+        statusCount=${fields[1]}
+        status=${fields[2]}
+	   # 슬래시 기호로 READY 상태를 분할
+	IFS='/' read -ra statusParts <<< "$statusCount"
+    	if [ ${#statusParts[@]} -ne 2 ]; then
+        	continue
+    	fi
+
+    	#echo "statusParts[1]: ${statusParts[1]}" # 디버깅을 위한 출력
+
+        # 상태별로 카운트 증가
+        case "$status" in
+            "Pending")
+        	#echo "Pending"
+	        pendingCount=$((pendingCount + ${statusParts[1]}))
+                ;;
+            "Terminating")
+        	#echo "Terminating"
+	        terminatingCount=$((terminatingCount + ${statusParts[1]}))
+                ;;
+	esac
+    done <<< "$lines"
+
+    echo "	Pending: $pendingCount"
+    echo "	Terminating: $terminatingCount"
+fi
+
+
+
+
+if [ $cnt_node -eq $cnt_ready_node ] && [ $cnt_pod -eq $cnt_ready_pod ]; then
+	echo -e "\npass!!"
+else
+	echo -e "\nerror!!"
+fi

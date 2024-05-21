@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# --help 옵션 처리
+for arg in "$@"
+do
+    if [[ "$arg" == "--help" ]] || [[ "$arg" == "-h" ]]; then
+        echo -e "Try ssh access to a specific node.\n"
+        echo -e "Examples:\n\n  # Shows the names and IPs of all nodes in the cluster.\n  kubectl ssh\n\n  # Try ssh access to worker-1 node.\n  kubectl ssh worker-1\n"
+        exit 0
+    fi
+done
+
+# version 처리
+if [[ "$1" == "version" ]]
+then
+    echo "1.0.0"
+    exit 0
+fi
+
+# 아무것도 입력 안했을 경우 노드의 정보를 보여준다.
+if [[ "$1" == "" ]]; then
+    kubectl get no -o jsonpath='NAME{"\t"}INTERNAL_IP{"\n"}{range .items[*]}{.metadata.name}{"\t"}{.status.addresses[?(@.type == "InternalIP")].address} {"\n"}{end}'
+
+else
+    IP=$(kubectl get no -o jsonpath='NAME{"\t"}INTERNAL_IP{"\n"}{range .items[*]}{.metadata.name}{"\t"}{.status.addresses[?(@.type == "InternalIP")].address} {"\n"}{end}' | grep $1 | awk '{print $2}')
+
+    if [[ "$IP" == "" ]]; then
+        echo "$1 은 존재하는 노드가 아닙니다."
+        exit 1
+    fi
+    ssh beer1@$IP
+fi
