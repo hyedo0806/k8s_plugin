@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var execCommand = exec.Command
+
 func checkReadyNode() int {
 	cmd := exec.Command("kubectl", "get", "node", "--no-headers")
 	output, err := cmd.Output()
@@ -64,10 +66,11 @@ func checkReadyPod() int {
 	return cntNotReadyPod
 }
 
+// 하나의 문자열 인수를 받아 정수로 변환: 성공하면 변환된 정수와 nil오류, 실패하면 0과 오류
 func atoi(str string) int {
 	num, err := strconv.Atoi(str)
 	if err != nil {
-		return 0
+		return 10
 	}
 	return num
 }
