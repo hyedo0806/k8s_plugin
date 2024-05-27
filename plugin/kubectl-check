@@ -22,24 +22,48 @@ check_ready_pod() {
     echo $cnt_notready_pod
 }
 
-    
+VAR_TIME=10
+
+## 매개변수 처리
+for VAR_ARG in "$@"
+do
+    VAR_KEY=$(echo ${VAR_ARG} | cut -d= -f1)
+    VAR_VAL=$(echo ${VAR_ARG} | cut -d= -f2)
+
+    case "${VAR_KEY}" in
+        "iter") VAR_ITER=${VAR_VAL} ;;
+        "time"  ) VAR_TIME=${VAR_VAL}   ;;
+        *       )
+    esac
+done
+
+count=0
+#echo -e "\nDEBUG iter ${VAR_ITER}"
+#echo -e "\nDEBUG time ${VAR_TIME}"
 
 while :; do
-    echo "Retrying ... "
-    hello=0
+    #echo -e "\nRetrying ..." 
+    
     notready_node=$(check_ready_node)
     notready_pod=$(check_ready_pod)
-    echo -e "\nDEBUG : " $notready_node
-    echo -e "\nDEBUG : " $notready_pod
+    #echo -e "\nDEBUG : " $notready_node
+    #echo -e "\nDEBUG : " $notready_pod
 
     if [ $notready_node -eq 0 ] && [ $notready_pod -eq 0 ]; then
         echo -e "\nReady"
         break
     fi
     
-    echo -e "\nDEBUG cnt_notready_pod : " $cnt_notready_pod
+    if [ ! -z "$VAR_ITER" ]; then
+	    count=$((count+1))
+	    if [ $count -gt $VAR_ITER ]; then
+		   break
+	    fi
+    fi
 
-    if [ $hello -eq 0 ]; then
+    #echo -e "\nDEBUG cnt_notready_pod : " $cnt_notready_pod
+
+    if [ $notready_pod -ne 0 ]; then
         
         podsInfo=$(kubectl get pods)
         
@@ -48,6 +72,7 @@ while :; do
         
         pendingCount=0
         terminatingCount=0
+	creatingCount=0
 
         while read -r line; do
             if [ -z "$line" ]; then
@@ -76,18 +101,23 @@ while :; do
                 #echo "Pending"
                 pendingCount=$((pendingCount + ${statusParts[1]}))
                     ;;
-                "Terminating")
+
+		"ContainerCreating")
+		creatingCount=$((creatingCount + ${statusParts[1]}))
+		    ;;
+                # "Terminating")
                 #echo "Terminating"
-                terminatingCount=$((terminatingCount + ${statusParts[1]}))
-                    ;;
+                #terminatingCount=$((terminatingCount + ${statusParts[1]}))
+                #    ;;
        	    esac
         done <<< "$lines"
 
         echo "	Pending: $pendingCount"
-        echo "	Terminating: $terminatingCount"
+	echo "  ContainerCreating: $creatingCount"
+        #echo "	Terminating: $terminatingCount"
     fi
-    echo "Waiting for clusters to be ready ..."
-    sleep 10
+    echo -e "Retrying ...\n"
+    sleep $VAR_TIME
 done
 
 
