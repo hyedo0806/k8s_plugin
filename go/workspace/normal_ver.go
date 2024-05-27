@@ -1,8 +1,10 @@
 package main
 
 import (
-	"bytes"
+	//"bytes"
 	"fmt"
+	"os"
+	"strconv"
 	"os/exec"
 	"strings"
 	"time"
@@ -79,6 +81,7 @@ func main() {
 	var VAR_ITER, VAR_TIME int = 0, 10
 	for _, arg := range os.Args[1:] {
 		parts := strings.Split(arg, "=")
+		//fmt.Printf("%s\n", parts)
 		if len(parts) != 2 {
 			continue
 		}
