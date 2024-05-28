@@ -20,13 +20,13 @@ func checkReadyNode() int {
 	lines := strings.Split(string(output), "\n")
 	cntNode := len(lines) - 1
 
-	cmd = exec.Command("kubectl", "get", "nodes")
-	output, err = cmd.Output()
-	if err != nil {
-		fmt.Println("Error executing kubectl command:", err)
-		return -1
-	}
-	lines = strings.Split(string(output), "\n")
+	//cmd = exec.Command("kubectl", "get", "nodes")
+	//output, err = cmd.Output()
+	//if err != nil {
+	//	fmt.Println("Error executing kubectl command:", err)
+	//	return -1
+	//}
+	//lines = strings.Split(string(output), "\n")
 	cntReadyNode := 0
 	for _, line := range lines[1:] {
 		if strings.Contains(line, " Ready ") {
@@ -64,6 +64,42 @@ func checkReadyPod() int {
 	}
 	cntNotReadyPod := cntPod - cntReadyPod
 	return cntNotReadyPod
+}
+
+func getPodStatus() {
+	cmd := exec.Command("kubectl", "get", "pods")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Error executing kubectl command:", err)
+		break
+	}
+	lines := strings.Split(string(output), "\n")
+
+	pendingCount, creatingCount := 0, 0
+	for _, line := range lines[1:] {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		statusCount, status := fields[1], fields[2]
+		statusParts := strings.Split(statusCount, "/")
+		if len(statusParts) != 2 {
+			continue
+		}
+
+		switch status {
+		case "Pending":
+			pendingCount += atoi(statusParts[1])
+		case "ContainerCreating":
+			creatingCount += atoi(statusParts[1])
+		}
+	}
+
+	fmt.Printf("Pending: %d\n", pendingCount)
+	fmt.Printf("ContainerCreating: %d\n", creatingCount)
 }
 
 // 하나의 문자열 인수를 받아 정수로 변환: 성공하면 변환된 정수와 nil오류, 실패하면 0과 오류
@@ -109,39 +145,7 @@ func main() {
 		}
 
 		if notReadyPod != 0 {
-			cmd := exec.Command("kubectl", "get", "pods")
-			output, err := cmd.Output()
-			if err != nil {
-				fmt.Println("Error executing kubectl command:", err)
-				break
-			}
-			lines := strings.Split(string(output), "\n")
-
-			pendingCount, creatingCount := 0, 0
-			for _, line := range lines[1:] {
-				if line == "" {
-					continue
-				}
-				fields := strings.Fields(line)
-				if len(fields) < 3 {
-					continue
-				}
-				statusCount, status := fields[1], fields[2]
-				statusParts := strings.Split(statusCount, "/")
-				if len(statusParts) != 2 {
-					continue
-				}
-
-				switch status {
-				case "Pending":
-					pendingCount += atoi(statusParts[1])
-				case "ContainerCreating":
-					creatingCount += atoi(statusParts[1])
-				}
-			}
-
-			fmt.Printf("Pending: %d\n", pendingCount)
-			fmt.Printf("ContainerCreating: %d\n", creatingCount)
+			getPodStatus()
 		}
 
 		fmt.Println("Retrying ...")
