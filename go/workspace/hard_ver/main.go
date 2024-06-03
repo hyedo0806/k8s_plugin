@@ -12,6 +12,41 @@ import (
     "k8s.io/client-go/util/homedir"
 )
 
+type Condition struct {
+	Type               string
+	Status             string
+	LastHeartbeatTime  string
+	LastTransitionTime string
+	Reason             string
+	Message            string
+}
+
+func parseConditions(input string) []Condition {
+	// Regular expression to match each condition block
+	re := regexp.MustCompile(`{([^}]*)}`)
+	matches := re.FindAllStringSubmatch(input, -1)
+
+	var conditions []Condition
+
+	for _, match := range matches {
+		// Splitting each condition block into fields
+		fields := strings.Fields(match[1])
+		if len(fields) >= 6 {
+			condition := Condition{
+				Type:               fields[0],
+				Status:             fields[1],
+				LastHeartbeatTime:  fields[2] + " " + fields[3] + " " + fields[4] + " " + fields[5],
+				LastTransitionTime: fields[6] + " " + fields[7] + " " + fields[8] + " " + fields[9],
+				Reason:             fields[10],
+				Message:            strings.Join(fields[11:], " "),
+			}
+			conditions = append(conditions, condition)
+		}
+	}
+
+	return conditions
+}
+
 func main() {
      // kubeconfig 파일 경로 설정
      var kubeconfig string
@@ -39,38 +74,63 @@ func main() {
         log.Fatalf("Error listing nodes: %v", err)
     }
 
-    fmt.Println("<Nodes>")
+    cntNode := len(nodes.Items)
+    cntReadyNode := 0
+    fmt.Println("<Nodes> %d\n",cntNode)
     for _, node := range nodes.Items {
         fmt.Printf("Name: %s\n", node.Name)
-	//	fmt.Printf("Name: %s\n", node.Name)
-    	//fmt.Printf("Labels: %v\n", node.Labels)
-    	//fmt.Printf("Annotations: %v\n", node.Annotations)
-    	//fmt.Printf("Addresses: %v\n", node.Status.Addresses)
-    	fmt.Printf("Conditions: %v\n", node.Status.Conditions)
-    	//fmt.Printf("Capacity: %v\n", node.Status.Capacity)
-    	//fmt.Printf("Allocatable: %v\n", node.Status.Allocatable)
-    	//fmt.Printf("DaemonEndpoints: %v\n", node.Status.DaemonEndpoints)
-    	//fmt.Printf("NodeInfo: %v\n", node.Status.NodeInfo)
-    	//fmt.Printf("PodCIDR: %v\n", node.Spec.PodCIDR)
-    	//fmt.Printf("ProviderID: %v\n", node.Spec.ProviderID)
-    	//fmt.Printf("Unschedulable: %v\n", node.Spec.Unschedulable)
+
+        input = strings.TrimPrefix(node.Status.Conditions, "Conditions: ")
+
+	    conditions := parseConditions(input)
+
+        for _, condition := range conditions {
+            fmt.Printf("Type: %s", condition.Type)
+            fmt.Printf("  Status: %s\n", condition.Status)
+            if condition.Status == "Ready" {
+                cntReadyNode += 1
+            }
+            //fmt.Printf("LastHeartbeatTime: %s\n", condition.LastHeartbeatTime)
+            //fmt.Printf("LastTransitionTime: %s\n", condition.LastTransitionTime)
+            //fmt.Printf("Reason: %s\n", condition.Reason)
+            //fmt.Printf("Message: %s\n", condition.Message)
+            fmt.Println()
+        }
+    		
     }
-    
+    fmt.Printf("ReadyNode %d\n", cntReadyNode)
+
     // 파드 정보 가져오기 (디폴트 네임스페이스)
     pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
     if err != nil {
         log.Fatalf("Error listing pods: %v", err)
     }
 
-    fmt.Println("<Pods>")
+    cntPod := len(pods.Items)
+    cntReadyPod := 0
+    fmt.Println("<Pods> %d\n", cntPod)
     for _, pod := range pods.Items {
-        fmt.Printf("Namespace: %s, Name: %s\n", pod.Namespace, pod.Name)
-	labels := pod.Labels
-		for k, v := range labels {
-			fmt.Printf("Pod %s Namespace %s Label %s:%s ", pod.Name, pod.Namespace, k, v)
-			fmt.Printf("Contidions :%s\n", pod.Status)
-		}
-	}
 
+        fmt.Printf("Namespace: %s, Name: %s\n", pod.Namespace, pod.Name)
+        
+        input = strings.TrimPrefix(pod.Status.Conditions, "Conditions: ")
+
+	    conditions := parseConditions(input)
+
+        for _, condition := range conditions {
+            fmt.Printf("Type: %s", condition.Type)
+            fmt.Printf("  Status: %s\n", condition.Status)
+            if condition.Status == "Ready" {
+                cntReadyPod += 1
+            }
+            //fmt.Printf("LastHeartbeatTime: %s\n", condition.LastHeartbeatTime)
+            //fmt.Printf("LastTransitionTime: %s\n", condition.LastTransitionTime)
+            //fmt.Printf("Reason: %s\n", condition.Reason)
+            //fmt.Printf("Message: %s\n", condition.Message)
+            fmt.Println()
+        }
+   
+	}
+    fmt.Printf("ReadyPod %d\n", cntReadyPod)
 
 }
